@@ -3,6 +3,7 @@ use emlauncher;
 create table `user_pass` (
   `mail` varchar(255) not null,
   `passhash` varchar(255) default null,
+  `as_admin` tinyint(4) default 0 comment 'Administrator権限',
   primary key (`mail`)
 )Engine=InnoDB default charset=utf8;
 
@@ -15,8 +16,9 @@ create table `application` (
   `repository` varchar(1000) default null comment 'リポジトリURLなど',
   `last_upload` datetime default null comment 'パッケージの最終アップロード時刻',
   `last_commented` datetime default null comment '最終コメント時刻',
+  `last_requested` datetime default null comment '最終リクエスト時刻',
   `created` datetime not null,
-  `date_to_sort` datetime not null comment 'last_upload,last_comment,createdのうち最新のもの',
+  `date_to_sort` datetime not null comment 'last_upload,last_comment,last_requested,createdのうち最新のもの',
   unique key `idx_api_key` (`api_key`),
   key idx_date_to_sort (`date_to_sort`) comment '新着ソート用',
   primary key (`id`)
@@ -48,7 +50,7 @@ create table `package` (
   `description` text,
   `identifier` varchar(255) default null comment 'CFBundleIdentifier/PackageName',
   `original_file_name` varchar(255) default null,
-  `file_size` integer default null,
+  `file_size` bigint default null,
   `protect` tinyint not null default 0 comment '保護フラグ. 0:自動削除する; 1:自動削除対象外',
   `created` datetime not null,
   key `idx_app` (`app_id`),
@@ -66,6 +68,7 @@ create table install_log (
   `id` integer not null auto_increment,
   `app_id` integer not null,
   `package_id` integer not null,
+  `device_info_id` int(11) default 0 comment 'iOSデバイス情報のid',
   `mail` varchar(255) not null,
   `user_agent` varchar(1000) not null,
   `installed` datetime not null comment 'インストール日時',
@@ -118,16 +121,52 @@ CREATE TABLE guestpass_log
   `ip_address` VARCHAR(255) NOT NULL,
   `installed` DATETIME NOT NULL,
   KEY `idx_guest_pass_id` (`guest_pass_id`)
+) Engine=InnoDB default charset=utf8;
+
+CREATE TABLE `ios_device_info` (
+                                   `id` int(11) NOT NULL AUTO_INCREMENT,
+                                   `mail` varchar(255) NOT NULL,
+                                   `device_uuid` varchar(36) NOT NULL UNIQUE,
+                                   `device_udid` varchar(40) DEFAULT NULL UNIQUE,
+                                   `device_name` varchar(64) DEFAULT NULL,
+                                   `device_version` varchar(32) DEFAULT NULL,
+                                   `device_product` varchar(32) DEFAULT NULL,
+                                   PRIMARY KEY (`id`),
+                                   KEY `idx_mail` (`mail`),
+                                   KEY `idx_device_uuid` (`device_uuid`),
+                                   KEY `idx_device_udid` (`device_udid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `package_udid` (
+                                `id` int(11) NOT NULL AUTO_INCREMENT,
+                                `package_id` int(11) NOT NULL,
+                                `device_udid` varchar(36) DEFAULT NULL,
+                                PRIMARY KEY (`id`),
+                                KEY `idx_package_id` (`package_id`),
+                                KEY `idx_device_udid` (`device_udid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+create table `request` (
+                           `id` integer not null auto_increment,
+                           `app_id` integer not null,
+                           `package_id` integer default null,
+                           `number` integer not null comment 'アプリ毎の通し番号',
+                           `mail` varchar(255) not null comment 'リクエストした人',
+                           `message` text not null,
+                           `device_udid` varchar(36) not null comment 'リクエストした端末のUDID',
+                           `created` datetime not null,
+                           key idx_app (`app_id`),
+                           key idx_pkg (`package_id`),
+                           primary key (`id`)
 )Engine=InnoDB default charset=utf8;
 
-drop table if exists `attached_file`;
 create table `attached_file` (
   `id` integer not null auto_increment,
   `app_id` integer not null,
   `package_id` integer not null,
   `file_name` varchar(255) not null,
   `original_file_name` varchar(255) not null,
-  `file_size` integer not null,
+  `file_size` bigint not null,
   `file_type` varchar(5) not null,
   `created` datetime not null,
   KEY `idx_app` (`app_id`),
