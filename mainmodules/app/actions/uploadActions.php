@@ -2,6 +2,7 @@
 require_once __DIR__.'/actions.php';
 require_once APP_ROOT.'/model/Package.php';
 require_once APP_ROOT.'/model/PackageUDID.php';
+require_once APP_ROOT.'/model/AttachedFile.php';
 
 class uploadActions extends appActions
 {
@@ -31,11 +32,12 @@ class uploadActions extends appActions
 		$title = mfwRequest::param('title');
 		$description = mfwRequest::param('description');
 		$tag_names = mfwRequest::param('tags');
-		$ios_identifier = mfwRequest::param('ios_identifier');
+		$identifier = mfwRequest::param('identifier');
 		$notify = mfwRequest::param('notify');
 		$org_filename = mfwRequest::param('file_name');
 		$filesize = mfwRequest::param('file_size');
-		$provisioned_devices = mfwRequest::param('provisioned_devices');
+		$protect = mfwRequest::param('protect');
+		$attached_files = mfwRequest::param('attached_files',array());
 
 		if(!$temp_name || !$title){
 			error_log(__METHOD__.'('.__LINE__."): bad request: $temp_name, $title");
@@ -43,17 +45,28 @@ class uploadActions extends appActions
 		}
 		$ext = pathinfo($temp_name,PATHINFO_EXTENSION);
 
+		$renamed = array();
 		$con = mfwDBConnection::getPDO();
 		$con->beginTransaction();
 		try{
 			$app = ApplicationDb::retrieveByPKForUpdate($this->app->getId(),$con);
 
-			$tags = $app->getTagsByName($tag_names,$con);
+			$tags = $app->getOrInsertTagsByName($tag_names,$con);
 
 			$pkg = PackageDb::insertNewPackage(
-				$this->app->getId(),$platform,$ext,$title,$description,$ios_identifier,$org_filename,$filesize,$tags,$con);
+				$this->app->getId(),$platform,$ext,$title,$description,$identifier,$org_filename,$filesize,$tags,$protect,$con);
+			$attached = array();
+			foreach($attached_files as $file){
+				$attached[$file['temp_name']] = AttachedFileDb::insertNewAttachedFile(
+					$pkg,$file['file_name'],$file['size'],$file['type'],$con);
+			}
 
 			$pkg->renameTempFile($temp_name);
+			$renamed[] = $pkg;
+			foreach($attached as $temp => $file){
+				$file->renameTempFile($temp);
+				$renamed[] = $file;
+			}
 
 			if ( !empty($provisioned_devices) ) {
 				$ios_udid_list = explode(",", $provisioned_devices);
@@ -61,7 +74,7 @@ class uploadActions extends appActions
 				foreach ( $ios_udid_list as $ios_udid ) {
 					$udid = PackageUDIDDb::insertNewPackageUUID($pkg->getId(), $ios_udid);
 				}
-			}
+            }
 
 			$app->updateLastUpload($pkg->getCreated(),$con);
 
@@ -70,6 +83,9 @@ class uploadActions extends appActions
 		catch(Exception $e){
 			error_log(__METHOD__.'('.__LINE__.'): '.get_class($e).":{$e->getMessage()}");
 			$con->rollback();
+			foreach($renamed as $o){
+				$o->deleteFile();
+			}
 			throw $e;
 		}
 

@@ -2,7 +2,7 @@
 require_once __DIR__.'/ApplicationOwner.php';
 require_once __DIR__.'/Tag.php';
 require_once __DIR__.'/InstallLog.php';
-require_once __DIR__.'/S3.php';
+require_once __DIR__.'/Storage.php';
 require_once __DIR__.'/Random.php';
 
 /**
@@ -14,6 +14,7 @@ class Application extends mfwObject {
 
 	protected $owners = null;
 	protected $tags = null;
+	protected $unused_tags = null;
 	protected $install_users = null;
 
 	public function getId(){
@@ -30,7 +31,7 @@ class Application extends mfwObject {
 	}
 	public function getIconUrl()
 	{
-		return S3::url($this->value('icon_key'));
+		return Storage::url($this->value('icon_key'));
 	}
 
 	public function getLastUpload($format=null){
@@ -102,19 +103,19 @@ class Application extends mfwObject {
 		mfwDBIBase::query($sql,$bind,$con);
 	}
 
-        public function updateLastRequested($date,$con=null)
-        {
-                $this->row['last_requested'] = $date;
-                $this->calcDateToSort();
+    public function updateLastRequested($date,$con=null)
+    {
+        $this->row['last_requested'] = $date;
+        $this->calcDateToSort();
 
-                $sql = 'UPDATE application SET last_requested = :last_requested, date_to_sort = :date_to_sort WHERE id = :id';
-                $bind = array(
-                        ':last_requested' => $this->getLastRequested(),
-                        ':date_to_sort' => $this->getDateToSort(),
-                        ':id' => $this->getId(),
-                        );
-                mfwDBIBase::query($sql,$bind,$con);
-        }
+        $sql = 'UPDATE application SET last_requested = :last_requested, date_to_sort = :date_to_sort WHERE id = :id';
+        $bind = array(
+            ':last_requested' => $this->getLastRequested(),
+            ':date_to_sort' => $this->getDateToSort(),
+            ':id' => $this->getId(),
+            );
+        mfwDBIBase::query($sql,$bind,$con);
+    }
 
 	public function getAPIKey()
 	{
@@ -175,6 +176,14 @@ class Application extends mfwObject {
 		return $this->tags;
 	}
 
+	public function getUnusedTags()
+	{
+		if($this->unused_tags===null){
+			$this->unused_tags = TagDb::selectUnusedTagsByAppId($this->getId());
+		}
+		return $this->unused_tags;
+	}
+
 	public function getInstallUsers()
 	{
 		if($this->install_users===null){
@@ -193,7 +202,7 @@ class Application extends mfwObject {
 	 * タグ名からTagSetを取得.
 	 * 新しいtag_nameがあったら登録もする.
 	 */
-	public function getTagsByName($tag_names,PDO $con=null)
+	public function getOrInsertTagsByName($tag_names,PDO $con=null)
 	{
 		if(empty($tag_names)){
 			return new TagSet();
@@ -213,6 +222,29 @@ class Application extends mfwObject {
 				$tag = TagDb::insertNewTag($this->getId(),$name,$con);
 				$tags[] = $tag;
 				$this->tags[] = $tag;
+			}
+		}
+		return $tags;
+	}
+
+	/**
+	 * タグ名からTagSetを取得.
+	 */
+	public function getTagsByName($tag_names,PDO $con=null)
+	{
+		if(empty($tag_names)){
+			return new TagSet();
+		}
+		$this->tags = TagDb::selectByAppId($this->getId(),$con);
+		$tags = new TagSet();
+		// タグの数はたかが知れているので、愚直に一つずつ探す
+		foreach($tag_names as $name){
+			if(!$name){
+				continue;
+			}
+			$pk = $this->tags->searchPK('name',$name);
+			if($pk){
+				$tags[] = $this->tags[$pk];
 			}
 		}
 		return $tags;
@@ -259,13 +291,13 @@ class Application extends mfwObject {
 		$old_icon_key = null;
 		if($image){
 			$old_icon_key = $this->value('icon_key');
-			$this->row['icon_key'] = ApplicationDb::uploadIcon($image,$this->getId());
+			$this->row['icon_key'] = ApplicationDb::saveIcon($image,$this->getId());
 		}
 		$this->update($con);
 
 		if($old_icon_key){
 			try{
-				S3::delete($old_icon_key);
+				Storage::delete($old_icon_key);
 			}
 			catch(Exception $e){
 				error_log(__METHOD__.'('.__LINE__.'): '.get_class($e).":{$e->getMessage()}");
@@ -299,7 +331,7 @@ class ApplicationDb extends mfwObjectDb {
 
 	const ICON_DIR = 'app-icons/';
 
-	public static function uploadIcon($image,$app_id)
+	public static function saveIcon($image,$app_id)
 	{
 		$im = new Imagick();
 		$im->readImageBlob($image);
@@ -307,7 +339,7 @@ class ApplicationDb extends mfwObjectDb {
 		$im->setFormat('png');
 
 		$key = static::ICON_DIR."$app_id/".Random::string(16).'.png';
-		S3::uploadData($key,$im,'image/png','public-read');
+		Storage::saveIcon($key,$im);
 
 		return $key;
 	}
@@ -341,8 +373,8 @@ class ApplicationDb extends mfwObjectDb {
 		$app = new Application($row);
 		$app->insert();
 
-		// upload icon to S3
-		$icon_key = static::uploadIcon($image,$app->getId());
+		// save icon to Storage
+		$icon_key = static::saveIcon($image,$app->getId());
 
 		$table = static::TABLE_NAME;
 		mfwDBIBase::query(
@@ -368,9 +400,9 @@ class ApplicationDb extends mfwObjectDb {
 
 	public static function selectCount()
 	{
-			$table = static::TABLE_NAME;
-			$sql = "SELECT count(*) FROM `$table`";
-			return mfwDBIBase::getOne($sql);
+		$table = static::TABLE_NAME;
+		$sql = "SELECT count(*) FROM `$table`";
+		return mfwDBIBase::getOne($sql);
 	}
 
 	public static function selectByUpdateOrderWithLimit($offset, $count)

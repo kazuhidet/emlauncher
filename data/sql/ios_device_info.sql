@@ -11,5 +11,5 @@ CREATE TABLE `ios_device_info` (
   KEY `idx_mail` (`mail`),
   KEY `idx_device_uuid` (`device_uuid`),
   KEY `idx_device_udid` (`device_udid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -2,6 +2,7 @@
 require_once __DIR__.'/actions.php';
 require_once APP_ROOT.'/model/InstallLog.php';
 require_once APP_ROOT.'/model/Random.php';
+require_once APP_ROOT.'/model/AttachedFile.php';
 
 class installActions extends packageActions
 {
@@ -38,10 +39,22 @@ class installActions extends packageActions
 					));
 			$url = 'itms-services://?action=download-manifest&url='.urlencode($plist_url);
 		}
-		else{
-			// iPhone以外でのアクセスはパッケージを直接DL
-			$url = $this->package->getFileUrl('+60 min');
+		else if($ua->isAndroid() && $this->package->isAndroidAppBundle()){
+			// AndroidからのアクセスでAABファイルの時、添付ファイルにAPKがあればそれをDL
+			$target = $this->package->getAttachedFiles()->pickupByType(AttachedFile::TYPE_APK);
+			if(!$target){
+				$target = $this->package;
+			}
+			$url = $target->getFileUrl(self::TIME_LIMIT);
 		}
+		else{
+			// それ以外のアクセスはパッケージを直接DL
+			$url = $this->package->getFileUrl(self::TIME_LIMIT);
+		}
+
+		apache_log('app_id',$this->app->getId());
+		apache_log('pkg_id',$this->package->getId());
+		apache_log('platform',$this->package->getPlatform());
 
 		$con = mfwDBConnection::getPDO();
 		$con->beginTransaction();
@@ -54,10 +67,6 @@ class installActions extends packageActions
 			error_log(__METHOD__.'('.__LINE__.'): '.get_class($e).":{$e->getMessage()}");
 			throw $e;
 		}
-
-		apache_log('app_id',$this->app->getId());
-		apache_log('pkg_id',$this->package->getId());
-		apache_log('platform',$this->package->getPlatform());
 
 		return $this->redirect($url);
 	}
@@ -73,9 +82,9 @@ class installActions extends packageActions
 		$pkg = $this->package;
 		$app = $pkg->getApplication();
 
-		$ipa_url = $pkg->getFileUrl('+60 min');
+		$ipa_url = $pkg->getFileUrl(self::TIME_LIMIT);
 		$image_url = $app->getIconUrl();
-		$bundle_identifier = $pkg->getIOSIdentifier();
+		$bundle_identifier = $pkg->getIdentifier();
 		$pkg_title = $pkg->getTitle();
 		$app_title = $app->getTitle();
 

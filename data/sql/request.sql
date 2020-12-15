@@ -11,4 +11,4 @@ create table `request` (
   key idx_app (`app_id`),
   key idx_pkg (`package_id`),
   primary key (`id`)
-)Engine=InnoDB default charset=utf8;
+)Engine=InnoDB default charset=utf8mb4;

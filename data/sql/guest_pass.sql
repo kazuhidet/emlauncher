@@ -22,4 +22,4 @@ CREATE TABLE guestpass_log
   `ip_address` VARCHAR(255) NOT NULL,
   `installed` DATETIME NOT NULL,
   KEY `idx_guest_pass_id` (`guest_pass_id`)
-)Engine=InnoDB default charset=utf8;
+)Engine=InnoDB default charset=utf8mb4;

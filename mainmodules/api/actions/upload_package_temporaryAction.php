@@ -23,10 +23,10 @@ class upload_package_temporaryAction extends apiActions
 
 			$temp_name = Package::uploadTempFile($file_path,$ext,$mime);
 
-			$ios_identifier = null;
+			$identifier = null;
 			if($platform===Package::PF_IOS){
 				$plist = IPAFile::parseInfoPlist($file_path);
-				$ios_identifier = $plist['CFBundleIdentifier'];
+				$identifier = $plist['CFBundleIdentifier'];
 				if ( Config::get('enable_request_ios_udid') ) {
 					$mobile_provision = IPAFile::parseMobileProvision($file_info['tmp_name']);
 					//var_dump_log("mobile_provision(t)", $mobile_provision);
@@ -47,7 +47,7 @@ class upload_package_temporaryAction extends apiActions
 				'file_name' => $file_name,
 				'temp_name' => $temp_name,
 				'platform' => $platform,
-				'ios_identifier' => $ios_identifier,
+				'identifier' => $identifier,
 				'provisioned_devices' => $provisioned_devices,
 				));
 	}

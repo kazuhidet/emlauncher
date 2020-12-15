@@ -2,8 +2,10 @@
 require_once APP_ROOT.'/model/Application.php';
 require_once APP_ROOT.'/model/Tag.php';
 require_once APP_ROOT.'/model/Random.php';
-require_once APP_ROOT.'/model/S3.php';
+require_once APP_ROOT.'/model/Storage.php';
 require_once APP_ROOT.'/model/PackageUDID.php';
+require_once APP_ROOT.'/model/AttachedFile.php';
+require_once APP_ROOT.'/model/Config.php';
 
 /**
  * Row object for 'package' table.
@@ -15,15 +17,12 @@ class Package extends mfwObject {
 	const PF_ANDROID = 'Android';
 	const PF_IOS = 'iOS';
 	const PF_UNKNOWN = 'unknown';
-	const MIME_ANDROID = 'application/vnd.android.package-archive';
+	const MIME_ANDROID_APK = 'application/vnd.android.package-archive';
+	const MIME_ANDROID_AAB = 'application/octet-stream';
 	const MIME_IOS = 'application/octet-stream';
 
 	const FILE_DIR = 'package/';
 	const TEMP_DIR = 'temp-data/';
-
-	// AppStore, GooglePlayでの制限ファイルサイズ(MB)
-	const IOS_FILE_SIZE_LIMIT_MB = 100;
-	const ANDROID_FILE_SIZE_LIMIT_MB = 50;
 
 	const SHORT_DESCRIPTION_LENGTH = 100;
 
@@ -31,6 +30,15 @@ class Package extends mfwObject {
 	protected $tags = null;
 	protected $guest_passes = null;
 	protected $install_users = null;
+	protected $attached_files = null;
+	protected $config = null;
+
+	protected function getConfig(){
+		if($this->config===null){
+			$this->config = Config::get('package');
+		}
+		return $this->config;
+	}
 
 	public function getId(){
 		return $this->value('id');
@@ -65,14 +73,17 @@ class Package extends mfwObject {
 		return $desc;
 	}
 
-	public function getIOSIdentifier(){
-		return $this->value('ios_identifier');
+	public function getIdentifier(){
+		return $this->value('identifier');
 	}
 	public function getOriginalFileName(){
 		return $this->value('original_file_name');
 	}
 	public function getFileSize(){
 		return $this->value('file_size');
+	}
+	public function isProtected(){
+		return (bool)$this->value('protect');
 	}
 	public function getCreated($format=null){
 		$created = $this->value('created');
@@ -84,11 +95,12 @@ class Package extends mfwObject {
 
 	public function getFileSizeLimitMB()
 	{
+		$conf = $this->getConfig();
 		switch($this->getPlatform()){
 		case self::PF_IOS:
-			return self::IOS_FILE_SIZE_LIMIT_MB;
+			return (int)$conf['file_size_warning_ios'];
 		case self::PF_ANDROID:
-			return self::ANDROID_FILE_SIZE_LIMIT_MB;
+			return (int)$conf['file_size_warning_android'];
 		default:
 			return 0;
 		}
@@ -124,28 +136,28 @@ class Package extends mfwObject {
 	public function uploadFile($file_path,$mime)
 	{
 		$key = $this->getFileKey();
-		S3::uploadFile($key,$file_path,$mime,'private');
+		Storage::saveFile($key,$file_path,$mime);
 	}
 	public static function uploadTempFile($file_path,$ext,$mime)
 	{
 		$tmp_name = Random::string(16).".$ext";
-		S3::uploadFile(static::TEMP_DIR.$tmp_name,$file_path,$mime,'private');
+		Storage::saveFile(static::TEMP_DIR.$tmp_name,$file_path,$mime);
 		return $tmp_name;
 	}
 	public function renameTempFile($temp_name)
 	{
 		$tempkey = static::TEMP_DIR.$temp_name;
 		$newkey = $this->getFileKey();
-		S3::rename($tempkey,$newkey,'private');
+		Storage::rename($tempkey,$newkey);
 	}
 	public function deleteFile()
 	{
 		$key = $this->getFileKey();
-		S3::delete($key);
+		Storage::delete($key);
 	}
 	public function getFileUrl($expire=null)
 	{
-		return S3::url($this->getFileKey(),$expire);
+		return Storage::url($this->getFileKey(),$expire,$this->getOriginalFileName());
 	}
 
 	public function getInstallUrl()
@@ -172,10 +184,11 @@ class Package extends mfwObject {
 		return count($users);
 	}
 
-	public function updateInfo($title,$description,TagSet $tags,$con=null)
+	public function updateInfo($title,$description,$protect,TagSet $tags,$con=null)
 	{
 		$this->row['title'] = $title;
 		$this->row['description'] = $description;
+		$this->row['protect'] = $protect? 1: 0;
 		$this->update($con);
 		TagDb::removeFromPackage($this,$con);
 		TagDb::insertPackageTags($this,$tags,$con);
@@ -186,6 +199,7 @@ class Package extends mfwObject {
 	{
 		TagDb::removeFromPackage($this,$con);
 		PackageUDIDDb::removeFromPackage($this, $con);
+		$this->getAttachedFiles()->delete($con);
 		return parent::delete($con);
 	}
 
@@ -216,6 +230,20 @@ class Package extends mfwObject {
 			return $installablePackageIds;
 		}
 		return null;
+    }
+
+	public function getAttachedFiles()
+	{
+		if($this->attached_files===null){
+			$this->attached_files = AttachedFileDb::selectByPackageId($this->getId());
+		}
+		return $this->attached_files;
+	}
+
+	public function isAndroidAppBundle()
+	{
+		return $this->getPlatform()===self::PF_ANDROID
+			&& pathinfo($this->getOriginalFileName(),PATHINFO_EXTENSION)==='aab';
 	}
 }
 
@@ -247,7 +275,11 @@ class PackageDb extends mfwObjectDb {
 		$is_zip = file_get_contents($filepath,false,null,0,4)==="PK\x03\x04";
 		if($is_zip && $ext==='apk'){
 			$platform = Package::PF_ANDROID;
-			$mime = Package::MIME_ANDROID;
+			$mime = Package::MIME_ANDROID_APK;
+		}
+		if($is_zip && $ext=='aab'){
+			$platform = Package::PF_ANDROID;
+			$mime = Package::MIME_ANDROID_AAB;
 		}
 		if($is_zip && $ext==='ipa'){
 			$platform = Package::PF_IOS;
@@ -256,7 +288,7 @@ class PackageDb extends mfwObjectDb {
 		return array($platform,$ext,$mime);
 	}
 
-	public static function insertNewPackage($app_id,$platform,$ext,$title,$description,$ios_identifier,$org_file_name,$file_size,TagSet $tags,$con)
+	public static function insertNewPackage($app_id,$platform,$ext,$title,$description,$identifier,$org_file_name,$file_size,TagSet $tags,$protect,$con)
 	{
 		$row = array(
 			'app_id' => $app_id,
@@ -264,9 +296,10 @@ class PackageDb extends mfwObjectDb {
 			'file_name' => Random::string(16).".$ext",
 			'title' => $title,
 			'description' => $description,
-			'ios_identifier' => $ios_identifier,
+			'identifier' => $identifier,
 			'original_file_name' => $org_file_name,
 			'file_size' => $file_size,
+			'protect' => $protect? 1: 0,
 			'created' => date('Y-m-d H:i:s'),
 			);
 		$pkg = new Package($row);
@@ -326,5 +359,20 @@ class PackageDb extends mfwObjectDb {
 		$sql .= sprintf(' ORDER BY p.id DESC LIMIT %d, %d', $offset, $count);
 		return new PackageSet(mfwDBIBase::getAll($sql, $bind));
 	}
-}
 
+	/**
+	 * 削除すべきパッケージを取得.
+	 * @param[in] Application $app 対象アプリ
+	 * @param[in] int $keep 削除ぜず保持する上限数
+     * @param[in] int $limit 取得する上限数
+	 */
+	public function selectDeletablePackages(Application $app,$keep=1000,$limit=100,$con=null)
+	{
+		$sql = sprintf(
+			'WHERE app_id=:app_id AND protect=0 AND id not in '
+			. '(select * from (select id from package '
+			.	'WHERE app_id=:app_id AND protect=0 ORDER BY id DESC LIMIT %d) t'
+			. ') ORDER BY id LIMIT %d', $keep, $limit);
+		return self::selectSet($sql,array(':app_id' => $app->getId()),$con);
+	}
+}

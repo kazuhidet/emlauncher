@@ -26,7 +26,7 @@ class appActions extends MainActions
 		return null;
 	}
 
-	public function build($params)
+	public function build($params=array(),$headers=array())
 	{
 		if(!isset($params['app'])){
 			$params['app'] = $this->app;
@@ -76,28 +76,29 @@ class appActions extends MainActions
 		static $pf = array(
 			'android' => Package::PF_ANDROID,
 			'ios' => Package::PF_IOS,
+			'other' => Package::PF_UNKNOWN,
 			'all' => null,
 			);
 
-		$platform = mfwRequest::param('vpf');
-		if ( !in_array($platform, array('android', 'ios', 'all')) ) {
-			$platform = mfwRequest::param('pf');
-			if(!in_array($platform,array('android','ios','all'))){
-				$ua = mfwRequest::userAgent();
-				if($ua->isAndroid()){
-					$platform = 'android';
-				}
-				elseif($ua->isIOS()){
-					$platform = 'ios';
-				}
-				else{
-					$platform = 'all';
-				}
+		$platform = mfwRequest::param('pf');
+		if(!in_array($platform,array('android','ios','other','all'))){
+			$ua = mfwRequest::userAgent();
+			if($ua->isAndroid()){
+				$platform = 'android';
+			}
+			elseif($ua->isIOS()){
+				$platform = 'ios';
+			}
+			else{
+				$platform = 'all';
 			}
 		}
 
 		$tags = mfwRequest::param('tags') ? explode(' ', mfwRequest::param('tags')) : array();
-		$current_page = mfwRequest::param('page', 1);
+		$current_page = (int)mfwRequest::param('page', 1);
+		if($current_page<1){
+			$current_page = 1;
+		}
 
 		$offset = ($current_page - 1) * self::LINE_IN_PAGE;
 		$pkgs = PackageDb::selectByAppIdPfTagsWithLimit(
@@ -116,7 +117,7 @@ class appActions extends MainActions
 		$commented_package = PackageDb::retrieveByPKs($top_comments->getColumnArray('package_id'));
 
 		$params = array(
-			'vpf' => $platform,
+			'pf' => $platform,
 			'is_owner' => $this->app->isOwner($this->login_user),
 			'packages' => $pkgs,
 			'active_tags' => $tags,

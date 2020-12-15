@@ -23,7 +23,7 @@
         </div>
         <div class="col-sm-9 col-sm-offset-3">
           <input type="submit" class="btn btn-primary" value="Login">
-          <a class="btn btn-link" href="<?=url('/login/password_reminder')?>">forget password</a>
+          <a class="btn btn-link" href="<?=url('/login/password_reminder')?>">forgot password</a>
         </div>
       </form>
       <?php endif ?>
@@ -31,6 +31,12 @@
       <?php if($enable_google_auth): ?>
       <div class="google-login col-sm-10 col-sm-offset-1">
         <a class="btn btn-primary col-xs-12" href="<?=url('/login/google')?>">Login with google account</a>
+      </div>
+      <?php endif ?>
+
+      <?php if($enable_azuread_auth): ?>
+      <div class="azuread-login col-sm-10 col-sm-offset-1">
+        <a class="btn btn-primary col-xs-12" href="<?=url('/login/azuread')?>">Login with AzureAD account</a>
       </div>
       <?php endif ?>
     </div>

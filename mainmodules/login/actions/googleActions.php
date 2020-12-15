@@ -4,6 +4,7 @@ require_once APP_ROOT.'/model/UserPass.php';
 
 class googleActions extends loginActions
 {
+	const FAILEDMAILKEY = 'google_failed_mail';
 
 	public function executeGoogle()
 	{
@@ -32,19 +33,25 @@ class googleActions extends loginActions
 
 		$mail = isset($userinfo['email'])? $userinfo['email']: null;
 
+		apache_log('user',$mail);
+
 		if(!$this->checkAccount($mail)){
+			mfwSession::set(self::FAILEDMAILKEY,$mail);
 			return $this->redirect('/login/google_error');
 		}
 
 		User::login($mail);
-		apache_log('user',$mail);
+		mfwSession::clear(self::FAILEDMAILKEY);
 
 		return $this->redirectUrlBeforeLogin();
 	}
 
 	public function executeGoogle_error()
 	{
-		return $this->build();
+		$param = array(
+			'mail' => mfwSession::get(self::FAILEDMAILKEY),
+			);
+		return $this->build($param);
 	}
 
 	protected function getAccessToken($code)
@@ -62,7 +69,7 @@ class googleActions extends loginActions
 			'redirect_uri' => $callback_url,
 			'grant_type' => 'authorization_code',
 			);
-		$response = mfwHttp::post($url_base,$query);
+		$response = mfwHttp::post($url_base,$query,['Expect:']);
 		return json_decode($response,true);
 	}
 

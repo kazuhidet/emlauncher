@@ -18,6 +18,9 @@ require_once APP_ROOT.'/mfw/mfwObjectDb.php';
 require_once APP_ROOT.'/mfw/mfwHttp.php';
 //require_once APP_ROOT.'/mfw/mfwOAuth.php';
 
+//古いPHPを使っているのでとりあえず
+//require_once APP_ROOT."/vendor/autoload.php";
+
 function apache_log($key,$value)
 {
 	static $log = array();

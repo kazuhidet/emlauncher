@@ -34,7 +34,7 @@ class UserPass extends mfwObject {
 		}
 	}
 
-	public function randomstring($length)
+	protected function randomstring($length)
 	{
 		$chars = '1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 		$strlen = strlen($chars);
@@ -44,7 +44,7 @@ class UserPass extends mfwObject {
 		}
 		return $str;
 	}
-	public function calchash($pass,$salt,$stretch)
+	protected function calchash($pass,$salt,$stretch)
 	{
 		$hash = sha1("{$pass}{$salt}");
 		for($i=0;$i<$stretch;++$i){
@@ -106,14 +106,15 @@ class UserPass extends mfwObject {
 class UserPassSet extends mfwObjectSet {
 	const PRIMARY_KEY = 'mail';
 /*
-        protected $user;
+    protected $user;
 
-        public function __construct(UserPass $user,Array $rows=array())
-        {
-                parent::__construct($rows);
-                $this->user = $user;
-        }
+    public function __construct(UserPass $user,Array $rows=array())
+    {
+        parent::__construct($rows);
+        $this->user = $user;
+    }
 */
+
 	public static function hypostatize(Array $row=array())
 	{
 		return new UserPass($row);
@@ -133,7 +134,6 @@ class UserList {
         }
 }
 
-
 /**
  * database accessor for 'user_pass' table.
  */
@@ -146,22 +146,22 @@ class UserPassDb extends mfwObjectDb {
 		return static::selectOne('WHERE mail = ?',array($email));
 	}
 
-        public static function insertNewUser($email, $password, $as_admin = 0)
-        {
-                // insert new user
-                $stretch = mt_rand(10,20);
-                $salt = UserPass::randomstring(16);
-                $hash = UserPass::calchash($password,$salt,$stretch);
+    public static function insertNewUser($email, $password, $as_admin = 0)
+    {
+        // insert new user
+        $stretch = mt_rand(10,20);
+        $salt = UserPass::randomstring(16);
+        $hash = UserPass::calchash($password,$salt,$stretch);
 
-                $passhash = "{$stretch}:{$salt}:{$hash}";
-                $row = array(
-                        'mail' => $email,
-                        'passhash' => $passhash,
-			'as_admin' => $as_admin,
-                        );
-                $user_pass = new UserPass($row);
-                $user_pass->insert();
+        $passhash = "{$stretch}:{$salt}:{$hash}";
+        $row = array(
+            'mail' => $email,
+            'passhash' => $passhash,
+            'as_admin' => $as_admin,
+            );
+        $user_pass = new UserPass($row);
+        $user_pass->insert();
 
-                return $user_pass;
-        }
+        return $user_pass;
+    }
 }

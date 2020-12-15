@@ -12,7 +12,7 @@ class S3 {
 		$this->config = Config::get('aws');
 		if ( $this->config == null ) {
 			$client = null;
-			$this->config = Config::get('local_filesystem');
+			$this->config = Config::get('local_file');
 		}
 		else {
 			$this->client = Aws\S3\S3Client::factory(

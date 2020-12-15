@@ -24,9 +24,10 @@
         <input type="hidden" id="platform" name="platform" value="">
         <input type="hidden" id="temp-name" name="temp_name" value="">
         <input type="hidden" id="file-name" name="file_name" value="">
-        <input type="hidden" id="ios-identifier" name="ios_identifier" value="">
+        <input type="hidden" id="identifier" name="identifier" value="">
         <input type="hidden" id="file-size" name="file_size" value="">
-	<input type="hidden" id="provisioned_devices" name="provisioned_devices" value="">
+        <input type="hidden" id="provisioned_devices" name="provisioned_devices" value="">
+        <span id="attached-files" class="hidden"></span>
         <div class="well well-lg droparea text-center hidden-xs">
           Drop your apk/ipa file here.
         </div>
@@ -91,6 +92,14 @@
       </div>
 
       <div class="form-group">
+        <label for="protect" class="control-label col-md-2">Protection</label>
+        <div class="col-md-10">
+          <input type="checkbox" class="hidden" id="protect" name="protect" value="1">
+          <button class="btn btn-default lock-toggle" data-toggle="button"><i class="fa"></i></button>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label for="notify" class="control-label col-md-2">Notification</label>
         <div class="col-md-10">
           <input type="checkbox" class="hidden" id="notify" name="notify" value="1">
@@ -124,6 +133,9 @@
     $('#platform').val(null);
     $('#temp-name').val(null);
     $('#file-name').val(null);
+    $('#identifier').val(null);
+    $('#file-size').val(null);
+    $('#attached-files').empty();
     $('#file-name-display').html('<i class="fa fa-spinner fa-spin"></i> uploading...');
     $('#progress-bar').css('width', '0%');
     $('#progress-bar').removeClass('progress-bar-success progress-bar-danger');
@@ -139,7 +151,7 @@
     fd.append('file',file);
 
     current_xhr = $.ajax({
-      url: "<?=url('/api/upload_package_temporary?name=')?>"+file.name,
+      url: "<?=url('/ajax/upload_package_temporary?name=')?>"+file.name,
       type: "POST",
       contentType: false,
       data: fd,
@@ -157,12 +169,23 @@
       success: function(data){
         $('#platform').val(data.platform);
         $('#temp-name').val(data.temp_name);
-        $('#ios-identifier').val(data.ios_identifier);
-	$('#provisioned_devices').val(data.provisioned_devices);
+        $('#identifier').val(data.identifier);
+        $('#provisioned_devices').val(data.provisioned_devices);
         $('#file-name').val(file.name);
         $('#file-name-display').html('<i class="fa fa-check success"></i> '+file.name);
         $('#file-info').text(data.platform+', size: '+file.size.toLocaleString()+' bytes');
         $('#file-size').val(file.size);
+        console.log(data.attached_files);
+        for(let i=0; i<data.attached_files.length; i++){
+            let tag = '<input type="hidden" name="attached_files['+i+']';
+            console.log(tag);
+            console.log($('#attached-files'));
+            $('#attached-files')
+                 .append(tag+'[file_name]" value="'+data.attached_files[i].file_name+'">')
+                 .append(tag+'[temp_name]" value="'+data.attached_files[i].temp_name+'">')
+                 .append(tag+'[size]" value="'+data.attached_files[i].size+'">')
+                 .append(tag+'[type]" value="'+data.attached_files[i].type+'">');
+        }
         $('#submit').removeAttr('disabled');
         $('#progress-bar').parent().removeClass('progress-striped active');
         $('#progress-bar').css('width','100%');
@@ -276,6 +299,14 @@ $('#notify+button.checkbox').on('click',function(event){
   $(this).prev().prop('checked',!$(this).hasClass('active'));
 });
 
+// initialize protect button state
+if($('#protect').prop('checked')){
+    $('#protect').next().addClass('active');
+};
+// toggle lock-toggle
+$('#protect+button.lock-toggle').on('click',function(event){
+  $(this).prev().prop('checked',!$(this).hasClass('active'));
+});
 
 // form validation
 $('form').submit(function(){

@@ -43,12 +43,12 @@ class InstallApp extends mfwObject {
 		$bind = array(
 			':app_id' => $this->getAppId(),
 			':mail' => $this->getMail(),
-			':notify' => $this->getNotifySetting(),
+			':notify' => $this->getNotifySetting()? 1: 0,
 			);
 		return mfwDBIBase::query($sql,$bind,$con);
 	}
 
-	public function delete()
+	public function delete($con=null)
 	{
 		$sql = 'DELETE FROM app_install_user WHERE app_id = :app_id AND mail = :mail';
 		$bind = array(

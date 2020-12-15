@@ -6,5 +6,5 @@ CREATE TABLE `package_udid` (
   PRIMARY KEY (`id`),
   KEY `idx_package_id` (`package_id`),
   KEY `idx_device_udid` (`device_udid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

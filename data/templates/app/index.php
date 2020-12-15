@@ -57,15 +57,18 @@ foreach($top_comments as $c):
 <?php endif ?>
     </div>
 
-    <ul id="vpf-nav-tabs" class="nav nav-tabs">
-      <li<?php if($vpf==='android'):?> class="active"<?php endif?> id="android">
-        <a href="<?="?id={$app->getId()}&vpf=android"?>">Android</a>
+    <ul id="pf-nav-tabs" class="nav nav-tabs">
+      <li<?php if($pf==='android'):?> class="active"<?php endif?> id="android">
+        <a href="<?="?id={$app->getId()}&pf=android"?>">Android</a>
       </li>
-      <li<?php if($vpf==='ios'):?> class="active"<?php endif?> id="ios">
-        <a href="<?="?id={$app->getId()}&vpf=ios"?>">iOS</a>
+      <li<?php if($pf==='ios'):?> class="active"<?php endif?> id="ios">
+        <a href="<?="?id={$app->getId()}&pf=ios"?>">iOS</a>
       </li>
-      <li<?php if($vpf==='all'):?> class="active"<?php endif?> id="all">
-        <a href="<?="?id={$app->getId()}&vpf=all"?>">All</a>
+      <li<?php if($pf==='other'):?> class="active"<?php endif?> id="other">
+        <a href="<?="?id={$app->getId()}&pf=other"?>">Other</a>
+      </li>
+      <li<?php if($pf==='all'):?> class="active"<?php endif?> id="all">
+        <a href="<?="?id={$app->getId()}&pf=all"?>">All</a>
       </li>
     </ul>
 
@@ -88,11 +91,25 @@ foreach($top_comments as $c):
         <td class="package-list-item-info">
           <div class="row">
             <div class="col-xs-12 col-md-7">
+<?php if($pkg->isProtected()): ?>
+              <i class="fa fa-lock"></i>
+<?php endif ?>
               <a class="title" href="<?=url('/package?id='.$pkg->getId())?>"><?=htmlspecialchars($pkg->getTitle())?></a>
 <?php if($pkg->getDescription()):?>
               <p class="text-muted description"><?=$pkg->getShortDescription()?></p>
 <?php endif?>
-              <span class="info hidden-xs hidden-sm"><?=$pkg->getFileSize()?round($pkg->getFileSize()/1024/1024,1):'--'?> MB, <?=$pkg->getCreated('Y-m-d H:i')?></span>
+<?php
+    $units = array('B','KB','MB','GB');
+    $size = $pkg->getFileSize();
+    for($i=0;$i<count($units);$i++){
+        if($size<1024) break;
+        $size = round($size/1024, 1);
+    }
+?>
+<?php if($pkg->getIdentifier()): ?>
+              <span class="info hidden-xs hidden-sm"><?=$pkg->getIdentifier()?></span>
+<?php endif?>
+              <span class="info hidden-xs hidden-sm"><?=$pkg->getFileSize()?"{$size} {$units[$i]}":'--'?>, <?=$pkg->getCreated('Y-m-d H:i')?></span>
             </div>
             <div class="col-xs-12 col-md-5">
 <?php if($pkg->isFileSizeWarned()): ?>
@@ -103,7 +120,10 @@ foreach($top_comments as $c):
 <?php endforeach ?>
             </div>
           </div>
-          <span class="info visible-xs visible-sm"><?=$pkg->getFileSize()?round($pkg->getFileSize()/1024/1024,1):'--'?> MB</span>
+<?php if($pkg->getIdentifier()): ?>
+          <span class="info visible-xs visible-sm"><?=$pkg->getIdentifier()?></span>
+<?php endif?>
+          <span class="info visible-xs visible-sm"><?=$pkg->getFileSize()?"{$size} {$units[$i]}":'--'?></span>
           <span class="info visible-xs visible-sm"><?=$pkg->getCreated('Y-m-d H:i')?></span>
         </td>
         <td class="text-center">
@@ -175,16 +195,16 @@ function get_url_param_tabs() {
 }
 
 function compose_url() {
-  var vpf = 'all';
-  var $active_vpf_tabs = $('#vpf-nav-tabs>li.active');
-  if ($active_vpf_tabs.length>0) {
-    vpf = $active_vpf_tabs[0].id
+  var pf = 'all';
+  var $active_pf_tabs = $('#pf-nav-tabs>li.active');
+  if ($active_pf_tabs.length>0) {
+    pf = $active_pf_tabs[0].id
   }
   var of = '';
   if ($('i.fa-angle-double-up').length>0) {
     of = '&filter_open=1';
   }
-  return "<?="id={$app->getId()}&vpf="?>" + vpf + get_url_param_tabs() + of;
+  return "<?="id={$app->getId()}&pf="?>" + pf + get_url_param_tabs() + of;
 }
 
 // filter by tag
@@ -202,7 +222,7 @@ $('.package-list-item-info').on('click',function(event){
   $('a',this)[0].click();
 });
 
-$('#vpf-nav-tabs>li').on('click', function(event){
+$('#pf-nav-tabs>li').on('click', function(event){
   if ($('a', this)) {
     location.href = $('a', this)[0].href + get_url_param_tabs();
     event.preventDefault();

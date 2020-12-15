@@ -7,7 +7,7 @@
   </ol>
 
   <div class="page-header">
-    <h2><i class="fa fa-list-ul"></i> Create Token API</h2>
+    <h2><i class="fa fa-qrcode"></i> Create Token API</h2>
   </div>
 
   <div>
@@ -42,13 +42,13 @@
         <dt>Sample response:</dt>
         <dd>
           <pre><code>{
-  "package_url": "http://localhost/emlauncher/package?id=3",
-  "application_url": "http://localhost/emlauncher/app?id=1",
+  "package_url": "<?=url("/package?id=3")?>",
+  "application_url": "<?=url("/app?id=1")?>",
   "id": "3",
   "platform": "Android",
   "title": "test upload",
   "description": "upload package via upload api",
-  "ios_identifier": "",
+  "identifier": "org.klab.emlauncher.sample",
   "original_file_name": "emlauncher.apk",
   "file_size": "5776313",
   "created": "2013-11-29 12:26:19",

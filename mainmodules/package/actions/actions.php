@@ -8,6 +8,7 @@ require_once APP_ROOT.'/model/Request.php';
 class packageActions extends MainActions
 {
 	const INSTALL_TOKEN_PREFIX = 'pkg_install_token_';
+	const TIME_LIMIT = '+60 min';
 
 	/**
 	 * @var Package
@@ -48,7 +49,7 @@ class packageActions extends MainActions
 		return null;
 	}
 
-	public function build($params)
+	public function build($params=array(),$headers=array())
 	{
 		$params['package'] = $this->package;
 		$params['app'] = $this->app;
@@ -97,7 +98,7 @@ class packageActions extends MainActions
 			return $this->BuildErrorPage('Not Found', array(self::HTTP_404_NOTFOUND));
 		}
 		if (strtotime($this->guest_pass->getExpired()) < time()) {
-			error_log("invalid guestpass token: $token");
+			error_log("expired guestpass: $token (app:{$this->guest_pass->getAppId()} package:{$this->guest_pass->getPackageId()} mail:{$this->guest_pass->getMail()})");
 			return $this->BuildErrorpage('Invalid token', array(self::HTTP_403_FORBIDDEN));
 		}
 

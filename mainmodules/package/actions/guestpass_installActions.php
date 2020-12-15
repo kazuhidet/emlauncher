@@ -27,6 +27,7 @@ class guestpass_installActions extends packageActions
 	{
 		$pf = $this->package->getPlatform();
 		$ua = mfwRequest::userAgent();
+		$remote_ip = mfwRequest::remoteHost();
 
 		if($pf===Package::PF_IOS && $ua->isIOS()){
 			// itms-service での接続はセッションを引き継げない
@@ -40,15 +41,23 @@ class guestpass_installActions extends packageActions
 					));
 			$url = 'itms-services://?action=download-manifest&url='.urlencode($plist_url);
 		}
+		else if($ua->isAndroid() && $this->package->isAndroidAppBundle()){
+			// AndroidからのアクセスでAABファイルの時、添付ファイルにAPKがあればそれをDL
+			$target = $this->package->getAttachedFiles()->pickupByType(AttachedFile::TYPE_APK);
+			if(!$target){
+				$target = $this->package;
+			}
+			$url = $target->getFileUrl(self::TIME_LIMIT);
+		}
 		else{
-			// iPhone以外でのアクセスはパッケージを直接DL
-			$url = $this->package->getFileUrl('+60 min');
+			// それ以外のアクセスはパッケージを直接DL
+			$url = $this->package->getFileUrl(self::TIME_LIMIT);
 		}
 
 		$con = mfwDBConnection::getPDO();
 		$con->beginTransaction();
 		try{
-			GuestPassLog::Logging($this->guest_pass ,$ua, $_SERVER['REMOTE_ADDR'],$con);
+			GuestPassLog::Logging($this->guest_pass ,$ua, $remote_ip, $con);
 			$con->commit();
 		}
 		catch(Exception $e){
@@ -77,7 +86,7 @@ class guestpass_installActions extends packageActions
 
 		$ipa_url = $pkg->getFileUrl('+60 min');
 		$image_url = $app->getIconUrl();
-		$bundle_identifier = $pkg->getIOSIdentifier();
+		$bundle_identifier = $pkg->getIdentifier();
 		$pkg_title = $pkg->getTitle();
 		$app_title = $app->getTitle();
 
