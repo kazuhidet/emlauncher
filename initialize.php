@@ -18,8 +18,8 @@ require_once APP_ROOT.'/mfw/mfwObjectDb.php';
 require_once APP_ROOT.'/mfw/mfwHttp.php';
 //require_once APP_ROOT.'/mfw/mfwOAuth.php';
 
-//古いPHPを使っているのでとりあえず
-//require_once APP_ROOT."/vendor/autoload.php";
+// 古いPHPを使っている場合(PHP5)にはコメントアウトする
+require_once APP_ROOT."/vendor/autoload.php";
 
 function apache_log($key,$value)
 {
@@ -40,6 +40,7 @@ function var_dump_log($var_name, &$var)
 	error_log("$var_name: " . $var_dump . "\n", 3, "/tmp/var_dump.log");
 }
 
+/* 新しいPHPではコンフリクトするので削除
 // Compatibility for PHP 5.5
 function array_column($target_data, $column_key, $index_key = null)
 {
@@ -60,3 +61,4 @@ function array_column($target_data, $column_key, $index_key = null)
 		return FALSE;
 	return $result;
 }
+ */
